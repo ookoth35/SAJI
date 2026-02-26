@@ -128,18 +128,34 @@ export async function POST(req: NextRequest) {
 
     // Send code
     let codeSent = false;
+    let sendError = "";
+    
+    console.log("[v0] Attempting to send code via:", method, "to:", identifier);
+    
     if (method === "email") {
       codeSent = await sendCodeViaEmail(user.email, code);
+      if (!codeSent) {
+        sendError = "Failed to send email code";
+      }
     } else if (method === "phone" && user.phone) {
       codeSent = await sendPasswordResetCodeSMS(user.phone, code);
+      if (!codeSent) {
+        sendError = "Failed to send SMS code";
+      }
+    } else if (method === "phone" && !user.phone) {
+      sendError = "User phone number not found";
+      console.log("[v0] User phone not found");
     }
 
     if (!codeSent) {
+      console.error("[v0] Code sending failed:", sendError);
       return NextResponse.json(
-        createResponse(false, "Failed to send code. Please try again."),
+        createResponse(false, sendError || "Failed to send code. Please try again."),
         { status: 500 }
       );
     }
+
+    console.log("[v0] Code sent successfully to:", identifier);
 
     return NextResponse.json(
       createResponse(true, "Verification code sent successfully", {

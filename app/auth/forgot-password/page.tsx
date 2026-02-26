@@ -65,10 +65,14 @@ function ForgotPasswordContent() {
         }),
       })
 
+      console.log("[v0] Response status:", res.status);
+      
       const data = await res.json()
+      console.log("[v0] Response data:", data);
 
       if (!res.ok) {
         setError(data.message || "Failed to send code")
+        console.log("[v0] Error response:", data)
         setIsLoading(false)
         return
       }
@@ -79,8 +83,9 @@ function ForgotPasswordContent() {
       setMaskedIdentifier(data.data.maskedIdentifier)
       setStep("code")
     } catch (err) {
-      console.error("[v0] Error:", err)
-      setError("Failed to send verification code")
+      console.error("[v0] Network error:", err)
+      const errorMsg = err instanceof Error ? err.message : "Network error - Failed to send verification code"
+      setError(errorMsg)
     } finally {
       setIsLoading(false)
     }

@@ -3,11 +3,18 @@ import twilio from "twilio";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Initialize Twilio
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+// Initialize Twilio with validation
+let twilioClient: ReturnType<typeof twilio> | null = null;
+
+if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+  twilioClient = twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN
+  );
+  console.log("[v0] Twilio client initialized successfully");
+} else {
+  console.warn("[v0] Twilio credentials not fully configured. SMS sending will be unavailable until TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are set.");
+}
 
 interface EmailOptions {
   to: string;
@@ -287,10 +294,23 @@ export async function sendPasswordResetCodeSMS(
   code: string
 ): Promise<boolean> {
   try {
+    // Validate Twilio client is initialized
+    if (!twilioClient) {
+      console.error("[v0] Twilio client not initialized. Missing TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN");
+      return false;
+    }
+
     if (!process.env.TWILIO_PHONE_NUMBER) {
       console.error("[v0] TWILIO_PHONE_NUMBER not configured");
       return false;
     }
+
+    if (!phone) {
+      console.error("[v0] Phone number is required for SMS");
+      return false;
+    }
+
+    console.log("[v0] Sending password reset SMS to:", phone);
 
     const message = await twilioClient.messages.create({
       body: `Your SAJI password reset code is: ${code}. This code expires in 10 minutes. Never share this code with anyone.`,
@@ -298,7 +318,7 @@ export async function sendPasswordResetCodeSMS(
       to: phone,
     });
 
-    console.log("[v0] Password reset SMS sent via Twilio:", message.sid);
+    console.log("[v0] Password reset SMS sent via Twilio. SID:", message.sid);
     return true;
   } catch (error) {
     console.error("[v0] Error sending password reset SMS via Twilio:", error);
