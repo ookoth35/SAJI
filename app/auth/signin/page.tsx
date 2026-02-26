@@ -77,6 +77,7 @@ function SigninContent() {
 
       if (!res.ok) {
         setError(data.message || "Login failed")
+        setIsLoading(false)
         return
       }
 
@@ -99,7 +100,6 @@ function SigninContent() {
     } catch (err) {
       console.error("[v0] Login error:", err)
       setError("An error occurred. Please try again.")
-    } finally {
       setIsLoading(false)
     }
   }
@@ -382,75 +382,4 @@ function SigninContent() {
 
 export default function SigninPage() {
   return <SigninContent />
-}
-
-export default function SigninPage() {
-  return <SigninContent />
-}
-
-      // Save JWT
-      localStorage.setItem("token", data.data.token)
-
-      router.push("/dashboard")
-    } catch (err) {
-      setError("Something went wrong")
-      setIsLoading(false)
-    }
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-2">
-          <CardTitle className="text-3xl font-bold text-center">
-            SAJI
-          </CardTitle>
-          <CardDescription className="text-center">
-            Sign in to your account
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-6">
-          {error && (
-            <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Email</label>
-              <Input
-                name="email"
-                type="email"
-                required
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Password</label>
-              <Input
-                name="password"
-                type="password"
-                required
-                placeholder="••••••••"
-              />
-            </div>
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign In"}
-            </Button>
-          </form>
-
-          <p className="text-center text-sm text-muted-foreground">
-            Don’t have an account?{" "}
-            <Link href="/auth/signup" className="text-primary hover:underline">
-              Sign up
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  )
 }
