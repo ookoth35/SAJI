@@ -67,264 +67,289 @@ async function sendCodeViaEmail(email: string, code: string): Promise<boolean> {
 // Step 1: Request password reset (send code)
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { email, phone, method = "email" } = body;
+    const body = await req.json()
+    const { email, phone, method = "email" } = body
 
     if (!email && !phone) {
       return NextResponse.json(
         createResponse(false, "Email or phone is required"),
         { status: 400 }
-      );
+      )
     }
 
     if (!method || !["email", "phone"].includes(method)) {
       return NextResponse.json(
         createResponse(false, "Method must be 'email' or 'phone'"),
         { status: 400 }
-      );
+      )
     }
 
-    console.log("[v0] Password reset request via:", method);
+    console.log("[v0] Password reset request via:", method)
 
-    // Find user
-    let user;
-    if (method === "email" && email) {
-      user = await db.query.users.findFirst({
-        where: eq(users.email, email),
-      });
-    } else if (method === "phone" && phone) {
-      user = await db.query.users.findFirst({
-        where: eq(users.phone, phone),
-      });
-    }
+    try {
+      // Find user
+      let user
+      if (method === "email" && email) {
+        user = await db.query.users.findFirst({
+          where: eq(users.email, email),
+        })
+      } else if (method === "phone" && phone) {
+        user = await db.query.users.findFirst({
+          where: eq(users.phone, phone),
+        })
+      }
 
-    if (!user) {
-      // Security: Don't reveal if account exists
-      console.log("[v0] User not found");
+      if (!user) {
+        // Security: Don't reveal if account exists
+        console.log("[v0] User not found")
+        return NextResponse.json(
+          createResponse(true, "If an account exists, you will receive a verification code."),
+          { status: 200 }
+        )
+      }
+
+      // Generate reset code
+      const code = generateCode()
+      const identifier = method === "email" ? user.email : user.phone
+      const expiresAt = Date.now() + 600000 // 10 minutes
+
+      // Store code
+      const codeKey = crypto.randomBytes(16).toString("hex")
+      resetCodes.set(codeKey, {
+        userId: user.id,
+        email: user.email,
+        phone: user.phone,
+        code,
+        method,
+        expiresAt,
+        verified: false,
+      })
+
+      console.log("[v0] Reset code generated for:", identifier)
+
+      // Send code
+      let codeSent = false
+      let sendError = ""
+      
+      console.log("[v0] Attempting to send code via:", method, "to:", identifier)
+      
+      if (method === "email") {
+        codeSent = await sendCodeViaEmail(user.email, code)
+        if (!codeSent) {
+          sendError = "Failed to send email code"
+        }
+      } else if (method === "phone" && user.phone) {
+        codeSent = await sendPasswordResetCodeSMS(user.phone, code)
+        if (!codeSent) {
+          sendError = "Failed to send SMS code"
+        }
+      } else if (method === "phone" && !user.phone) {
+        sendError = "User phone number not found"
+        console.log("[v0] User phone not found")
+      }
+
+      if (!codeSent) {
+        console.error("[v0] Code sending failed:", sendError)
+        return NextResponse.json(
+          createResponse(false, sendError || "Failed to send code. Please try again."),
+          { status: 500 }
+        )
+      }
+
+      console.log("[v0] Code sent successfully to:", identifier)
+
       return NextResponse.json(
-        createResponse(true, "If an account exists, you will receive a verification code."),
+        createResponse(true, "Verification code sent successfully", {
+          codeKey,
+          maskedIdentifier: method === "email" 
+            ? user.email.replace(/(.{2})(.*)(.{2})/, "$1***$3")
+            : user.phone?.replace(/(.{2})(.*)(.{3})/, "$1****$3"),
+        }),
         { status: 200 }
-      );
-    }
-
-    // Generate reset code
-    const code = generateCode();
-    const identifier = method === "email" ? user.email : user.phone;
-    const expiresAt = Date.now() + 600000; // 10 minutes
-
-    // Store code
-    const codeKey = crypto.randomBytes(16).toString("hex");
-    resetCodes.set(codeKey, {
-      userId: user.id,
-      email: user.email,
-      phone: user.phone,
-      code,
-      method,
-      expiresAt,
-      verified: false,
-    });
-
-    console.log("[v0] Reset code generated for:", identifier);
-
-    // Send code
-    let codeSent = false;
-    let sendError = "";
-    
-    console.log("[v0] Attempting to send code via:", method, "to:", identifier);
-    
-    if (method === "email") {
-      codeSent = await sendCodeViaEmail(user.email, code);
-      if (!codeSent) {
-        sendError = "Failed to send email code";
-      }
-    } else if (method === "phone" && user.phone) {
-      codeSent = await sendPasswordResetCodeSMS(user.phone, code);
-      if (!codeSent) {
-        sendError = "Failed to send SMS code";
-      }
-    } else if (method === "phone" && !user.phone) {
-      sendError = "User phone number not found";
-      console.log("[v0] User phone not found");
-    }
-
-    if (!codeSent) {
-      console.error("[v0] Code sending failed:", sendError);
+      )
+    } catch (dbError) {
+      console.error("[v0] Database or service error:", dbError)
       return NextResponse.json(
-        createResponse(false, sendError || "Failed to send code. Please try again."),
-        { status: 500 }
-      );
+        createResponse(false, "Service unavailable. Please try again later."),
+        { status: 503 }
+      )
     }
-
-    console.log("[v0] Code sent successfully to:", identifier);
-
-    return NextResponse.json(
-      createResponse(true, "Verification code sent successfully", {
-        codeKey,
-        maskedIdentifier: method === "email" 
-          ? user.email.replace(/(.{2})(.*)(.{2})/, "$1***$3")
-          : user.phone?.replace(/(.{2})(.*)(.{3})/, "$1****$3"),
-      }),
-      { status: 200 }
-    );
   } catch (error) {
-    console.error("[v0] Password reset request error:", error);
+    console.error("[v0] Password reset request error:", error)
     return NextResponse.json(
       createResponse(false, "Failed to process request."),
       { status: 500 }
-    );
+    )
   }
 }
 
 // Step 2: Verify code
 export async function PUT(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { codeKey, code } = body;
+    const body = await req.json()
+    const { codeKey, code } = body
 
     if (!codeKey || !code) {
       return NextResponse.json(
         createResponse(false, "Code key and verification code are required"),
         { status: 400 }
-      );
+      )
     }
 
-    const codeData = resetCodes.get(codeKey);
+    try {
+      const codeData = resetCodes.get(codeKey)
 
-    if (!codeData) {
+      if (!codeData) {
+        return NextResponse.json(
+          createResponse(false, "Invalid or expired session"),
+          { status: 400 }
+        )
+      }
+
+      if (codeData.expiresAt < Date.now()) {
+        resetCodes.delete(codeKey)
+        return NextResponse.json(
+          createResponse(false, "Verification code has expired"),
+          { status: 400 }
+        )
+      }
+
+      if (codeData.code !== code) {
+        return NextResponse.json(
+          createResponse(false, "Invalid verification code"),
+          { status: 400 }
+        )
+      }
+
+      // Mark as verified
+      codeData.verified = true
+      resetCodes.set(codeKey, codeData)
+
+      console.log("[v0] Code verified for user:", codeData.userId)
+
+      // Generate reset token
+      const resetToken = crypto.randomBytes(32).toString("hex")
+      const resetLink = `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password?token=${resetToken}`
+
       return NextResponse.json(
-        createResponse(false, "Invalid or expired session"),
-        { status: 400 }
-      );
-    }
-
-    if (codeData.expiresAt < Date.now()) {
-      resetCodes.delete(codeKey);
+        createResponse(true, "Code verified successfully", {
+          resetToken,
+          resetLink,
+        }),
+        { status: 200 }
+      )
+    } catch (serviceError) {
+      console.error("[v0] Service error during code verification:", serviceError)
       return NextResponse.json(
-        createResponse(false, "Verification code has expired"),
-        { status: 400 }
-      );
+        createResponse(false, "Service unavailable. Please try again."),
+        { status: 503 }
+      )
     }
-
-    if (codeData.code !== code) {
-      return NextResponse.json(
-        createResponse(false, "Invalid verification code"),
-        { status: 400 }
-      );
-    }
-
-    // Mark as verified
-    codeData.verified = true;
-    resetCodes.set(codeKey, codeData);
-
-    console.log("[v0] Code verified for user:", codeData.userId);
-
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetLink = `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password?token=${resetToken}`;
-
-    // Store reset token with verification
-    const resetData = {
-      codeKey,
-      resetToken,
-      expiresAt: Date.now() + 3600000, // 1 hour
-    };
-
-    return NextResponse.json(
-      createResponse(true, "Code verified successfully", {
-        resetToken,
-        resetLink,
-      }),
-      { status: 200 }
-    );
   } catch (error) {
-    console.error("[v0] Code verification error:", error);
+    console.error("[v0] Code verification error:", error)
     return NextResponse.json(
       createResponse(false, "Failed to verify code."),
       { status: 500 }
-    );
+    )
   }
 }
 
 // Step 3: Reset password
 export async function PATCH(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { codeKey, newPassword, confirmPassword } = body;
+    const body = await req.json()
+    const { codeKey, newPassword, confirmPassword } = body
 
     if (!codeKey || !newPassword || !confirmPassword) {
       return NextResponse.json(
         createResponse(false, "All fields are required"),
         { status: 400 }
-      );
+      )
     }
 
     if (newPassword !== confirmPassword) {
       return NextResponse.json(
         createResponse(false, "Passwords do not match"),
         { status: 400 }
-      );
+      )
     }
 
     if (newPassword.length < 8) {
       return NextResponse.json(
         createResponse(false, "Password must be at least 8 characters"),
         { status: 400 }
-      );
+      )
     }
 
-    const codeData = resetCodes.get(codeKey);
-
-    if (!codeData || !codeData.verified) {
-      return NextResponse.json(
-        createResponse(false, "Please verify your code first"),
-        { status: 400 }
-      );
-    }
-
-    if (codeData.expiresAt < Date.now()) {
-      resetCodes.delete(codeKey);
-      return NextResponse.json(
-        createResponse(false, "Session has expired"),
-        { status: 400 }
-      );
-    }
-
-    // Hash password
-    const bcrypt = require("bcryptjs");
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    // Update user password
-    await db.execute(
-      `UPDATE users SET password_hash = ? WHERE id = ?`,
-      [hashedPassword, codeData.userId]
-    );
-
-    console.log("[v0] Password updated for user:", codeData.userId);
-
-    // Send confirmation email
     try {
-      const firstName = "User";
-      await sendPasswordResetEmail(
-        codeData.email,
-        "",
-        firstName
-      );
-    } catch (emailError) {
-      console.error("[v0] Error sending password reset confirmation:", emailError);
+      const codeData = resetCodes.get(codeKey)
+
+      if (!codeData || !codeData.verified) {
+        return NextResponse.json(
+          createResponse(false, "Please verify your code first"),
+          { status: 400 }
+        )
+      }
+
+      if (codeData.expiresAt < Date.now()) {
+        resetCodes.delete(codeKey)
+        return NextResponse.json(
+          createResponse(false, "Session has expired"),
+          { status: 400 }
+        )
+      }
+
+      try {
+        // Hash password
+        const bcrypt = require("bcryptjs")
+        const hashedPassword = await bcrypt.hash(newPassword, 10)
+
+        // Update user password
+        await db.execute(
+          `UPDATE users SET password_hash = ? WHERE id = ?`,
+          [hashedPassword, codeData.userId]
+        )
+
+        console.log("[v0] Password updated for user:", codeData.userId)
+
+        // Send confirmation email
+        try {
+          const firstName = "User"
+          await sendPasswordResetEmail(
+            codeData.email,
+            "",
+            firstName
+          )
+        } catch (emailError) {
+          console.error("[v0] Error sending password reset confirmation:", emailError)
+        }
+
+        // Clean up
+        resetCodes.delete(codeKey)
+
+        return NextResponse.json(
+          createResponse(true, "Password reset successfully"),
+          { status: 200 }
+        )
+      } catch (dbError) {
+        console.error("[v0] Database error during password update:", dbError)
+        return NextResponse.json(
+          createResponse(false, "Failed to update password. Please try again."),
+          { status: 503 }
+        )
+      }
+    } catch (serviceError) {
+      console.error("[v0] Service error during password reset:", serviceError)
+      return NextResponse.json(
+        createResponse(false, "Service unavailable. Please try again."),
+        { status: 503 }
+      )
     }
-
-    // Clean up
-    resetCodes.delete(codeKey);
-
-    return NextResponse.json(
-      createResponse(true, "Password reset successfully"),
-      { status: 200 }
-    );
   } catch (error) {
-    console.error("[v0] Password reset error:", error);
+    console.error("[v0] Password reset error:", error)
     return NextResponse.json(
       createResponse(false, "Failed to reset password."),
       { status: 500 }
-    );
+    )
   }
 }
