@@ -44,9 +44,10 @@ export function EmailSubscriptionPopup() {
     )
 
     if (!alreadySubscribed) {
+      // Show popup after 10 minutes (600,000 milliseconds)
       const timer = setTimeout(() => {
         setOpen(true)
-      }, 2500)
+      }, 600000)
 
       return () => clearTimeout(timer)
     }
