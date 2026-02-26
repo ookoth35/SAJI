@@ -71,43 +71,48 @@ export function EmailSubscriptionPopup() {
     setFeedback({ type: null, message: "" })
 
     try {
-      const subscribers: SubscriberData[] = JSON.parse(
-        localStorage.getItem("saji_subscribers") || "[]"
-      )
+      const deviceId = generateDeviceId()
+      
+      const response = await fetch("/api/subscribers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          deviceId,
+          subscribedAt: new Date().toISOString(),
+        }),
+      })
 
-      const emailExists = subscribers.some(
-        (sub) => sub.email.toLowerCase() === email.toLowerCase()
-      )
+      const data = await response.json()
 
-      if (emailExists) {
+      if (!response.ok) {
         setFeedback({
           type: "error",
-          message: "This email is already subscribed.",
+          message: data.message || "Subscription failed. Please try again.",
         })
         setIsLoading(false)
         return
       }
 
+      console.log("[v0] Newsletter subscription successful:", data)
+
+      // Store in localStorage for duplicate prevention
+      const subscribers: SubscriberData[] = JSON.parse(
+        localStorage.getItem("saji_subscribers") || "[]"
+      )
+      
       const newSubscriber: SubscriberData = {
         email,
         subscribedAt: new Date().toISOString(),
-        deviceId: generateDeviceId(),
+        deviceId,
       }
-
+      
       subscribers.push(newSubscriber)
       localStorage.setItem("saji_subscribers", JSON.stringify(subscribers))
 
-      const response = await fetch("/api/subscribers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newSubscriber),
-      })
-
-      if (!response.ok) throw new Error("API error")
-
       setFeedback({
         type: "success",
-        message: "You're subscribed! Check your inbox soon.",
+        message: data.message || "You're subscribed! Check your inbox soon.",
       })
 
       setEmail("")
@@ -117,6 +122,7 @@ export function EmailSubscriptionPopup() {
         setFeedback({ type: null, message: "" })
       }, 2000)
     } catch (error) {
+      console.error("[v0] Subscription error:", error)
       setFeedback({
         type: "error",
         message: "Something went wrong. Please try again.",
