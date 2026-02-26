@@ -8,20 +8,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { CheckCircle2 } from "lucide-react"
 
 export default function CompleteProfilePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // Read query params
+  // Read query params - both from signup and OAuth
   const emailFromQuery = searchParams.get("email") || ""
   const firstNameFromQuery = searchParams.get("firstName") || ""
   const lastNameFromQuery = searchParams.get("lastName") || ""
   const phoneFromQuery = searchParams.get("phone") || ""
   const roleFromQuery = searchParams.get("role") || "client"
+  const oauthMethod = searchParams.get("method") || null
+  const googleId = searchParams.get("googleId") || null
+  const appleId = searchParams.get("appleId") || null
+  const accessToken = searchParams.get("accessToken") || null
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
   const [formData, setFormData] = useState({
     firstName: firstNameFromQuery,
     lastName: lastNameFromQuery,
@@ -29,17 +35,21 @@ export default function CompleteProfilePage() {
     role: roleFromQuery,
     bio: "",
     email: emailFromQuery,
+    oauthMethod,
+    googleId,
+    appleId,
+    accessToken,
   })
 
   useEffect(() => {
-    setFormData({
+    setFormData((prev) => ({
+      ...prev,
       firstName: firstNameFromQuery,
       lastName: lastNameFromQuery,
       phone: phoneFromQuery,
       role: roleFromQuery,
-      bio: "",
       email: emailFromQuery,
-    })
+    }))
   }, [emailFromQuery, firstNameFromQuery, lastNameFromQuery, phoneFromQuery, roleFromQuery])
 
   const handleChange = (field: string, value: string) => {
@@ -54,25 +64,65 @@ export default function CompleteProfilePage() {
     try {
       const token = localStorage.getItem("token")
 
-const response = await fetch("/api/users/complete-profile", {
-  method: "POST",
-  headers: { 
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${token}`  // <--- send JWT
-  },
-  body: JSON.stringify(formData),
-})
+      console.log("[v0] Submitting profile completion:", {
+        ...formData,
+        accessToken: formData.accessToken ? "***" : null,
+      })
+
+      const response = await fetch("/api/users/complete-profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify(formData),
+      })
+
+      const data = await response.json()
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Failed to complete profile")
+        console.error("[v0] Profile completion error:", data)
+        throw new Error(data.error || data.message || "Failed to complete profile")
       }
 
-      router.push("/dashboard")
+      console.log("[v0] Profile completed successfully")
+
+      // Save token and user if provided
+      if (data.token) {
+        localStorage.setItem("token", data.token)
+      }
+      if (data.user) {
+        localStorage.setItem("user", JSON.stringify(data.user))
+      }
+
+      setSuccess(true)
+
+      // Redirect to dashboard after 2 seconds
+      setTimeout(() => {
+        router.push("/dashboard")
+      }, 2000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      const errorMsg = err instanceof Error ? err.message : "An error occurred"
+      console.error("[v0] Error completing profile:", err)
+      setError(errorMsg)
       setIsLoading(false)
     }
+  }
+
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
+        <Card className="w-full max-w-md p-8 text-center">
+          <div className="mb-6 flex justify-center">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+              <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold mb-2">Profile Complete!</h1>
+          <p className="text-muted-foreground">Redirecting to your dashboard...</p>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -80,6 +130,11 @@ const response = await fetch("/api/users/complete-profile", {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-2">
           <CardTitle className="text-2xl">Complete Your Profile</CardTitle>
+          {oauthMethod && (
+            <CardDescription>
+              Great! We've pre-filled your info from {oauthMethod === "google" ? "Google" : "Apple"}. Just add your phone number.
+            </CardDescription>
+          )}
           <CardDescription>Email: {formData.email || "(optional)"}</CardDescription>
         </CardHeader>
         <CardContent>
@@ -99,6 +154,7 @@ const response = await fetch("/api/users/complete-profile", {
                   value={formData.firstName}
                   onChange={(e) => handleChange("firstName", e.target.value)}
                   placeholder="John"
+                  disabled={oauthMethod ? true : false}
                   required
                 />
               </div>
@@ -109,10 +165,25 @@ const response = await fetch("/api/users/complete-profile", {
                   value={formData.lastName}
                   onChange={(e) => handleChange("lastName", e.target.value)}
                   placeholder="Doe"
+                  disabled={oauthMethod ? true : false}
                   required
                 />
               </div>
             </div>
+
+            {/* Email (read-only if from OAuth) */}
+            {formData.email && (
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  disabled={true}
+                  className="bg-muted"
+                />
+              </div>
+            )}
 
             {/* Phone */}
             <div className="space-y-2">

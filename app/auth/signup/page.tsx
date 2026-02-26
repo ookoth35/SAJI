@@ -123,10 +123,31 @@ function SignupContent() {
   const handleGoogleSignup = async () => {
     setIsLoading(true)
     try {
-      setError("Google signup coming soon")
+      console.log("[v0] Starting Google OAuth signup")
+      
+      // Initiate Google OAuth flow
+      const redirectUri = `${window.location.origin}/api/auth/oauth/google/callback`
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+      const scope = encodeURIComponent("openid profile email")
+      const responseType = "code"
+      const state = Math.random().toString(36).substring(7)
+      
+      // Store state for verification
+      sessionStorage.setItem("oauth_state", state)
+      
+      if (!clientId) {
+        setError("Google OAuth not configured")
+        console.error("[v0] Google client ID not found in env")
+        setIsLoading(false)
+        return
+      }
+
+      const googleOAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=${responseType}&scope=${scope}&state=${state}`
+      
+      window.location.href = googleOAuthUrl
     } catch (err) {
+      console.error("[v0] Google signup error:", err)
       setError("Failed to sign up with Google")
-    } finally {
       setIsLoading(false)
     }
   }
@@ -134,10 +155,29 @@ function SignupContent() {
   const handleAppleSignup = async () => {
     setIsLoading(true)
     try {
-      setError("Apple signup coming soon")
+      console.log("[v0] Starting Apple OAuth signup")
+      
+      // Initiate Apple OAuth flow
+      const redirectUri = `${window.location.origin}/api/auth/oauth/apple/callback`
+      const clientId = process.env.NEXT_PUBLIC_APPLE_CLIENT_ID
+      const state = Math.random().toString(36).substring(7)
+      
+      // Store state for verification
+      sessionStorage.setItem("oauth_state", state)
+      
+      if (!clientId) {
+        setError("Apple OAuth not configured")
+        console.error("[v0] Apple client ID not found in env")
+        setIsLoading(false)
+        return
+      }
+
+      const appleOAuthUrl = `https://appleid.apple.com/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&state=${state}`
+      
+      window.location.href = appleOAuthUrl
     } catch (err) {
+      console.error("[v0] Apple signup error:", err)
       setError("Failed to sign up with Apple")
-    } finally {
       setIsLoading(false)
     }
   }
