@@ -25,15 +25,25 @@ export function LocalizationProvider({ children }: { children: ReactNode }) {
 
   // Load from localStorage on mount
   useEffect(() => {
-    const savedLang = (localStorage.getItem("saji-language") as Language) || "en"
-    const savedCurrency = (localStorage.getItem("saji-currency") as CurrencyCode) || "KES"
-    const savedTheme = (localStorage.getItem("saji-theme") as "light" | "dark") || "light"
-    setLanguageState(savedLang)
-    setCurrencyState(savedCurrency)
-    setThemeState(savedTheme)
-    setMounted(true)
+    try {
+      if (typeof window === "undefined" || typeof localStorage === "undefined") {
+        setMounted(true)
+        return
+      }
 
-    applyTheme(savedTheme)
+      const savedLang = (localStorage.getItem("saji-language") as Language) || "en"
+      const savedCurrency = (localStorage.getItem("saji-currency") as CurrencyCode) || "KES"
+      const savedTheme = (localStorage.getItem("saji-theme") as "light" | "dark") || "light"
+      setLanguageState(savedLang)
+      setCurrencyState(savedCurrency)
+      setThemeState(savedTheme)
+      setMounted(true)
+
+      applyTheme(savedTheme)
+    } catch (error) {
+      console.error("[v0] Error loading localization settings:", error)
+      setMounted(true)
+    }
   }, [])
 
   const setLanguage = (lang: Language) => {

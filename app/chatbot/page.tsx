@@ -5,9 +5,7 @@ import {
   Send,
   X,
   Sparkles,
-  Phone,
   Loader2,
-  ShieldCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,6 +19,7 @@ interface Message {
 }
 
 export default function ChatbotPage() {
+  const [conversationId, setConversationId] = useState<string>("")
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -33,6 +32,7 @@ export default function ChatbotPage() {
   const [inputValue, setInputValue] = useState("")
   const [isTyping, setIsTyping] = useState(false)
   const [isEscalated, setIsEscalated] = useState(false)
+  const [escalationId, setEscalationId] = useState<string>("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const escalationKeywords = [
@@ -42,7 +42,23 @@ export default function ChatbotPage() {
     "human support",
     "real person",
     "speak to human",
+    "escalate",
+    "help me",
   ]
+
+  // Initialize conversation on mount
+  useEffect(() => {
+    const initializeConversation = async () => {
+      try {
+        const id = Math.random().toString(36).substring(7)
+        setConversationId(id)
+      } catch (error) {
+        console.error("[v0] Error initializing conversation:", error)
+      }
+    }
+
+    initializeConversation()
+  }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -53,23 +69,71 @@ export default function ChatbotPage() {
     return escalationKeywords.some((k) => lower.includes(k))
   }
 
-  const generateResponse = (text: string) => {
-    const lower = text.toLowerCase()
+  const escalateChat = async () => {
+    try {
+      const res = await fetch("/api/chat/escalate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId,
+          escalationReason: "User requested human support",
+          priority: "normal",
+        }),
+      })
 
-    if (lower.includes("order") || lower.includes("delivery"))
-      return "I can help track your order. Please share your order number."
+      const data = await res.json()
 
-    if (lower.includes("payment") || lower.includes("refund"))
-      return "Let me assist with your payment concern. Could you provide more details?"
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to escalate")
+      }
 
-    if (lower.includes("account") || lower.includes("password"))
-      return "For account-related issues, please confirm your registered email address."
+      setEscalationId(data.escalation.id)
+      setIsEscalated(true)
 
-    return "Thank you for reaching out. Could you provide a little more detail so I can assist better?"
+      // Add escalation message
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          text: data.assignedAgent
+            ? "Connecting you with support agent..."
+            : "Your request has been queued. A support specialist will join soon.",
+          sender: "ai",
+          timestamp: new Date(),
+          escalated: true,
+        },
+      ])
+
+      // Simulate agent joining
+      if (data.assignedAgent) {
+        setTimeout(() => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              text: `Hello! I'm here to help. I've received your previous conversation. How can I assist you today?`,
+              sender: "human",
+              timestamp: new Date(),
+            },
+          ])
+        }, 1500)
+      }
+    } catch (error) {
+      console.error("[v0] Escalation error:", error)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          text: "I'm having trouble connecting you with an agent. Please try again.",
+          sender: "ai",
+          timestamp: new Date(),
+        },
+      ])
+    }
   }
 
   const handleSend = async () => {
-    if (!inputValue.trim()) return
+    if (!inputValue.trim() || !conversationId) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -79,55 +143,79 @@ export default function ChatbotPage() {
     }
 
     setMessages((prev) => [...prev, userMessage])
+    const userInput = inputValue
     setInputValue("")
 
-    if (checkEscalation(inputValue)) {
-      setIsEscalated(true)
+    // Check if user wants to escalate
+    if (checkEscalation(userInput)) {
       setIsTyping(true)
-
       setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            text: "Connecting you with a human support specialist. Please wait...",
-            sender: "ai",
-            timestamp: new Date(),
-            escalated: true,
-          },
-        ])
         setIsTyping(false)
-      }, 1200)
+        escalateChat()
+      }, 800)
+      return
+    }
 
-      setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            text: "Hello 👋 I'm Sarah from SAJI Support. I’ll personally assist you from here.",
-            sender: "human",
-            timestamp: new Date(),
-          },
-        ])
-      }, 2500)
-
+    // If already escalated, send to agent
+    if (isEscalated) {
       return
     }
 
     setIsTyping(true)
 
-    setTimeout(() => {
+    try {
+      // First, save the message
+      await fetch("/api/chat/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId,
+          message: userInput,
+          userId: "user-id",
+        }),
+      })
+
+      // Get AI response
+      const res = await fetch("/api/chat/ai-response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId,
+          message: userInput,
+          userId: "user-id",
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to get response")
+      }
+
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now().toString(),
-          text: generateResponse(inputValue),
+          text: data.response,
           sender: "ai",
           timestamp: new Date(),
         },
       ])
+    } catch (error) {
+      console.error("[v0] Error sending message:", error)
+      const errorMessage = error instanceof Error ? error.message : "Unable to process your message"
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          text: `Sorry, I encountered an error: ${errorMessage}. Please try again or ask to speak with an agent.`,
+          sender: "ai",
+          timestamp: new Date(),
+        },
+      ])
+    } finally {
       setIsTyping(false)
-    }, 1000)
+    }
   }
 
   return (
@@ -137,14 +225,14 @@ export default function ChatbotPage() {
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-blue-600 text-white p-2 rounded-xl shadow">
-              <ShieldCheck className="w-5 h-5" />
+              <Sparkles className="w-5 h-5" />
             </div>
             <div>
               <h1 className="font-semibold text-gray-900 dark:text-white text-lg">
                 SAJI Support
               </h1>
               <p className="text-xs text-gray-500">
-                Secure AI & Human Assistance
+                {isEscalated ? "Connected to Support Agent" : "AI Assistant"}
               </p>
             </div>
           </div>
@@ -194,7 +282,7 @@ export default function ChatbotPage() {
           {isTyping && (
             <div className="flex items-center gap-2 text-gray-500 text-sm">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Typing...</span>
+              <span>Processing...</span>
             </div>
           )}
 
@@ -205,7 +293,7 @@ export default function ChatbotPage() {
       {/* ESCALATION STATUS */}
       {isEscalated && (
         <div className="bg-blue-50 border-t border-blue-200 text-blue-700 text-xs text-center py-2">
-          You are now connected to a human support specialist.
+          Connected to a human support specialist
         </div>
       )}
 
@@ -216,13 +304,17 @@ export default function ChatbotPage() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder="Type your message..."
-            disabled={isTyping}
+            placeholder={
+              isEscalated
+                ? "Message the support agent..."
+                : "Type your message..."
+            }
+            disabled={isTyping || !conversationId}
             className="flex-1 rounded-full px-5 py-2 bg-gray-100 dark:bg-gray-800 border-none focus-visible:ring-2 focus-visible:ring-blue-500"
           />
           <Button
             onClick={handleSend}
-            disabled={!inputValue.trim() || isTyping}
+            disabled={!inputValue.trim() || isTyping || !conversationId}
             className="rounded-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white shadow"
           >
             <Send className="w-4 h-4" />

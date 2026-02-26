@@ -1,6 +1,4 @@
 
-import { SessionProvider } from "next-auth/react"
-
 import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
@@ -8,7 +6,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { LocalizationProvider } from "@/lib/localization-context"
 import { AuthProvider } from "@/lib/auth-context"
-import { EmailSubscriptionPopup } from "@/components/email-subscription-popup"
+import { LayoutClientComponents } from "@/app/layout-client-components"
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
@@ -39,7 +37,7 @@ export const metadata: Metadata = {
     apple: "/apple-icon.png",
   },
   manifest: "/manifest.json",
-    generator: 'v0.app'
+  generator: "v0.app",
 }
 
 export const viewport: Viewport = {
@@ -68,11 +66,9 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} themes={["light", "dark"]} disableTransitionOnChange>
           <LocalizationProvider>
             <AuthProvider>
-               <SessionProvider>
-          {children} 
-          <EmailSubscriptionPopup />
-        </SessionProvider>
-             
+              <LayoutClientComponents>
+                {children}
+              </LayoutClientComponents>
             </AuthProvider>
           </LocalizationProvider>
         </ThemeProvider>

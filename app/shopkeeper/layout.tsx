@@ -1,8 +1,8 @@
 "use client"
 
-import React from "react"
+import React, { useEffect } from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef } from "react"
 import { 
   Store, Package, ShoppingCart, MessageCircle, Wallet, User, Settings, LogOut, 
   X, Menu, BarChart3, Bell, Users, Star, Tag, Search, ChevronDown, MoreHorizontal
@@ -20,7 +20,14 @@ export default function ShopkeeperLayout({ children }: { children: React.ReactNo
   const moreRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
   const router = useRouter()
-  const { logout } = useAuthContext()
+  const { logout, isAuthenticated, isLoading, user } = useAuthContext()
+
+  // Protect route - redirect if not authenticated or not a shopkeeper
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || user?.role !== "shopkeeper")) {
+      router.push("/auth/signin")
+    }
+  }, [isAuthenticated, isLoading, user, router])
 
   const isActive = (path: string) => pathname === path || (path !== "/shopkeeper" && pathname.startsWith(path + "/"))
   const isExactActive = (path: string) => pathname === path

@@ -29,8 +29,8 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
   }, [theme])
 
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "provider")) {
-      router.push("/auth/login")
+    if (!isLoading && (!isAuthenticated || user?.role !== "professional")) {
+      router.push("/auth/signin")
     }
   }, [isAuthenticated, isLoading, user, router])
 
@@ -46,7 +46,7 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
 
   const unreadCount = notifications.filter(n => !n.read).length
 
-  if (isLoading || !isAuthenticated || user?.role !== "provider") {
+  if (isLoading || !isAuthenticated || user?.role !== "professional") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />

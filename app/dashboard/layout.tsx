@@ -1,29 +1,28 @@
 'use client'
 
 import type React from 'react'
-import type { Metadata } from 'next'
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { LayoutGrid, MessageSquare, Wallet, Settings, LogOut, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { useAuthContext } from '@/lib/auth-context'
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { data: session, status } = useSession()
   const router = useRouter()
+  const { user, isLoading, logout } = useAuthContext()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
+    if (!isLoading && !user) {
       router.push('/auth/signin')
     }
-  }, [status, router])
+  }, [isLoading, user, router])
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768)
@@ -40,8 +39,17 @@ export default function DashboardLayout({
     { label: 'Profile', icon: Settings, href: '/dashboard/profile' },
   ]
 
-  if (status === 'loading') {
+  const handleLogout = () => {
+    logout()
+    router.push('/auth/signin')
+  }
+
+  if (isLoading) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>
+  }
+
+  if (!user) {
+    return null
   }
 
   return (
@@ -72,7 +80,7 @@ export default function DashboardLayout({
         </div>
 
         <div className="p-6 border-t border-border">
-          <Button variant="outline" className="w-full justify-start gap-2">
+          <Button onClick={handleLogout} variant="outline" className="w-full justify-start gap-2">
             <LogOut className="w-4 h-4" />
             <span className="hidden md:inline">Logout</span>
           </Button>
@@ -95,9 +103,9 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="text-sm text-muted-foreground hidden md:block">{session?.user?.email}</div>
+            <div className="text-sm text-muted-foreground hidden md:block">{user.email}</div>
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="font-medium">{session?.user?.name?.[0]?.toUpperCase() || 'U'}</span>
+              <span className="font-medium">{user.fullName?.[0]?.toUpperCase() || 'U'}</span>
             </div>
           </div>
         </header>

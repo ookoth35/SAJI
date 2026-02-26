@@ -1,6 +1,20 @@
 import { Resend } from "resend";
+import twilio from "twilio";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Initialize Twilio with validation
+let twilioClient: ReturnType<typeof twilio> | null = null;
+
+if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+  twilioClient = twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN
+  );
+  console.log("[v0] Twilio client initialized successfully");
+} else {
+  console.warn("[v0] Twilio credentials not fully configured. SMS sending will be unavailable until TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are set.");
+}
 
 interface EmailOptions {
   to: string;
@@ -31,16 +45,73 @@ export async function sendWelcomeEmail(
     `;
 
     const result = await resend.emails.send({
-      from: "onboarding@resend.dev", // Update this with your verified domain
+      from: "onboarding@resend.dev",
       to: email,
-      subject,
+      subject: "Welcome to SAJI",
       html,
     });
 
-    console.log("Welcome email sent:", result);
+    console.log("[v0] Welcome email sent:", result);
     return !result.error;
   } catch (error) {
-    console.error("Error sending welcome email:", error);
+    console.error("[v0] Error sending welcome email:", error);
+    return false;
+  }
+}
+
+// Send login notification email with device & location
+export async function sendLoginNotificationEmail(
+  email: string,
+  firstName: string,
+  deviceName: string,
+  location: string,
+  timestamp: string
+): Promise<boolean> {
+  try {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px; margin-bottom: 30px;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">New Login Detected</h1>
+        </div>
+        
+        <p>Hi ${firstName},</p>
+        <p>We detected a new login to your SAJI account. Here are the details:</p>
+        
+        <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
+          <p style="margin: 10px 0;"><strong>Device:</strong> ${deviceName}</p>
+          <p style="margin: 10px 0;"><strong>Location:</strong> ${location}</p>
+          <p style="margin: 10px 0;"><strong>Date & Time:</strong> ${timestamp}</p>
+        </div>
+        
+        <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ff9800;">
+          <p style="margin: 0; color: #856404;"><strong>If this wasn't you,</strong> please change your password immediately by clicking the link below.</p>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="https://app.saji.com/auth/forgot-password" style="background-color: #ff9800; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+            Secure Your Account
+          </a>
+        </div>
+        
+        <p style="color: #666; font-size: 14px; margin-top: 30px;">
+          For security, we never ask for your password via email. If you received a suspicious email claiming to be from SAJI, please report it.
+        </p>
+        
+        <p>Best regards,<br/><strong>SAJI Security Team</strong></p>
+      </div>
+    `;
+
+    const result = await resend.emails.send({
+      from: "onboarding@resend.dev",
+      to: email,
+      subject: "New Login to Your SAJI Account",
+      html,
+    });
+
+    console.log("[v0] Login notification email sent:", result);
+    return !result.error;
+  } catch (error) {
+    console.error("[v0] Error sending login notification:", error);
     return false;
   }
 }
@@ -76,10 +147,10 @@ export async function sendBookingConfirmation(
       html,
     });
 
-    console.log("Booking confirmation email sent:", result);
+    console.log("[v0] Booking confirmation email sent:", result);
     return !result.error;
   } catch (error) {
-    console.error("Error sending booking confirmation:", error);
+    console.error("[v0] Error sending booking confirmation:", error);
     return false;
   }
 }
@@ -114,29 +185,40 @@ export async function sendPaymentConfirmation(
       html,
     });
 
-    console.log("Payment confirmation email sent:", result);
+    console.log("[v0] Payment confirmation email sent:", result);
     return !result.error;
   } catch (error) {
-    console.error("Error sending payment confirmation:", error);
+    console.error("[v0] Error sending payment confirmation:", error);
     return false;
   }
 }
 
-// Send verification email
+// Send email verification email
 export async function sendVerificationEmail(
   email: string,
-  verificationLink: string
+  verificationLink: string,
+  firstName: string
 ): Promise<boolean> {
   try {
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1>Verify Your Email</h1>
-        <p>Thank you for signing up! Please verify your email address by clicking the link below:</p>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px; margin-bottom: 30px;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">Verify Your Email</h1>
+        </div>
+        
+        <p>Hi ${firstName},</p>
+        <p>Thank you for signing up! Please verify your email address by clicking the button below:</p>
+        
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${verificationLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-            Verify Email
+          <a href="${verificationLink}" style="background-color: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+            Verify Email Address
           </a>
         </div>
+        
+        <p style="color: #666; font-size: 14px;">Or copy this link: <a href="${verificationLink}" style="color: #667eea;">${verificationLink}</a></p>
+        
+        <p style="color: #999; font-size: 12px; margin-top: 30px;">This link will expire in 24 hours.</p>
+        
         <p>If you didn't sign up for this account, you can ignore this email.</p>
         <p>Best regards,<br/>SAJI Team</p>
       </div>
@@ -145,14 +227,14 @@ export async function sendVerificationEmail(
     const result = await resend.emails.send({
       from: "onboarding@resend.dev",
       to: email,
-      subject: "Verify Your Email Address",
+      subject: "Verify Your Email Address - SAJI",
       html,
     });
 
-    console.log("Verification email sent:", result);
+    console.log("[v0] Verification email sent:", result);
     return !result.error;
   } catch (error) {
-    console.error("Error sending verification email:", error);
+    console.error("[v0] Error sending verification email:", error);
     return false;
   }
 }
@@ -160,21 +242,34 @@ export async function sendVerificationEmail(
 // Send password reset email
 export async function sendPasswordResetEmail(
   email: string,
-  resetLink: string
+  resetLink: string,
+  firstName: string
 ): Promise<boolean> {
   try {
     const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1>Reset Your Password</h1>
-        <p>We received a request to reset your password. Click the link below to proceed:</p>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+        <div style="background: linear-gradient(135deg, #ff9800 0%, #ff6b6b 100%); padding: 30px; text-align: center; border-radius: 10px; margin-bottom: 30px;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">Reset Your Password</h1>
+        </div>
+        
+        <p>Hi ${firstName},</p>
+        <p>We received a request to reset your password. Click the button below to proceed:</p>
+        
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${resetLink}" style="background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+          <a href="${resetLink}" style="background-color: #ff9800; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
             Reset Password
           </a>
         </div>
-        <p>This link will expire in 1 hour.</p>
-        <p>If you didn't request this, you can ignore this email.</p>
-        <p>Best regards,<br/>SAJI Team</p>
+        
+        <p style="color: #666; font-size: 14px;">Or copy this link: <a href="${resetLink}" style="color: #ff9800;">${resetLink}</a></p>
+        
+        <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ff9800;">
+          <p style="margin: 0; color: #856404;"><strong>Important:</strong> This link will expire in 1 hour for security purposes.</p>
+        </div>
+        
+        <p style="color: #999; font-size: 12px;">If you didn't request this, you can safely ignore this email. Your account remains secure.</p>
+        
+        <p>Best regards,<br/>SAJI Security Team</p>
       </div>
     `;
 
@@ -185,10 +280,49 @@ export async function sendPasswordResetEmail(
       html,
     });
 
-    console.log("Password reset email sent:", result);
+    console.log("[v0] Password reset email sent:", result);
     return !result.error;
   } catch (error) {
-    console.error("Error sending password reset email:", error);
+    console.error("[v0] Error sending password reset email:", error);
     return false;
   }
 }
+
+// Send password reset code via SMS using Twilio
+export async function sendPasswordResetCodeSMS(
+  phone: string,
+  code: string
+): Promise<boolean> {
+  try {
+    // Validate Twilio client is initialized
+    if (!twilioClient) {
+      console.error("[v0] Twilio client not initialized. Missing TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN");
+      return false;
+    }
+
+    if (!process.env.TWILIO_PHONE_NUMBER) {
+      console.error("[v0] TWILIO_PHONE_NUMBER not configured");
+      return false;
+    }
+
+    if (!phone) {
+      console.error("[v0] Phone number is required for SMS");
+      return false;
+    }
+
+    console.log("[v0] Sending password reset SMS to:", phone);
+
+    const message = await twilioClient.messages.create({
+      body: `Your SAJI password reset code is: ${code}. This code expires in 10 minutes. Never share this code with anyone.`,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: phone,
+    });
+
+    console.log("[v0] Password reset SMS sent via Twilio. SID:", message.sid);
+    return true;
+  } catch (error) {
+    console.error("[v0] Error sending password reset SMS via Twilio:", error);
+    return false;
+  }
+}
+

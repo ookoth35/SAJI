@@ -3,7 +3,9 @@ import { neon } from "@neondatabase/serverless";
 import * as schema from "./schema";
 
 if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
+  throw new Error(
+    "DATABASE_URL environment variable is not set. Please add your Neon database connection string to your environment variables in the Vercel project settings under 'Vars'."
+  );
 }
 
 const sql = neon(process.env.DATABASE_URL);

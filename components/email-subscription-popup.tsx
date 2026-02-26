@@ -27,28 +27,45 @@ export function EmailSubscriptionPopup() {
     message: string
   }>({ type: null, message: "" })
 
-  // Generate stable device fingerprint
+  // Generate stable device fingerprint - only in browser
   const generateDeviceId = () => {
-    const base = `${navigator.userAgent}-${navigator.language}-${navigator.platform}`
-    return btoa(base).substring(0, 32)
+    if (typeof navigator === "undefined" || typeof window === "undefined") {
+      return "no-device"
+    }
+    try {
+      const base = `${navigator.userAgent}-${navigator.language}-${navigator.platform}`
+      return btoa(base).substring(0, 32)
+    } catch {
+      return "no-device"
+    }
   }
 
   useEffect(() => {
-    const deviceId = generateDeviceId()
-    const subscribers: SubscriberData[] = JSON.parse(
-      localStorage.getItem("saji_subscribers") || "[]"
-    )
+    // Only run in browser
+    if (typeof window === "undefined" || typeof localStorage === "undefined") {
+      return
+    }
 
-    const alreadySubscribed = subscribers.some(
-      (sub) => sub.deviceId === deviceId
-    )
+    try {
+      const deviceId = generateDeviceId()
+      const subscribers: SubscriberData[] = JSON.parse(
+        localStorage.getItem("saji_subscribers") || "[]"
+      )
 
-    if (!alreadySubscribed) {
-      const timer = setTimeout(() => {
-        setOpen(true)
-      }, 2500)
+      const alreadySubscribed = subscribers.some(
+        (sub) => sub.deviceId === deviceId
+      )
 
-      return () => clearTimeout(timer)
+      if (!alreadySubscribed) {
+        // Show popup after 10 minutes (600,000 milliseconds)
+        const timer = setTimeout(() => {
+          setOpen(true)
+        }, 600000)
+
+        return () => clearTimeout(timer)
+      }
+    } catch (error) {
+      console.error("[v0] Error initializing email popup:", error)
     }
   }, [])
 
@@ -71,43 +88,48 @@ export function EmailSubscriptionPopup() {
     setFeedback({ type: null, message: "" })
 
     try {
-      const subscribers: SubscriberData[] = JSON.parse(
-        localStorage.getItem("saji_subscribers") || "[]"
-      )
+      const deviceId = generateDeviceId()
+      
+      const response = await fetch("/api/subscribers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          deviceId,
+          subscribedAt: new Date().toISOString(),
+        }),
+      })
 
-      const emailExists = subscribers.some(
-        (sub) => sub.email.toLowerCase() === email.toLowerCase()
-      )
+      const data = await response.json()
 
-      if (emailExists) {
+      if (!response.ok) {
         setFeedback({
           type: "error",
-          message: "This email is already subscribed.",
+          message: data.message || "Subscription failed. Please try again.",
         })
         setIsLoading(false)
         return
       }
 
+      console.log("[v0] Newsletter subscription successful:", data)
+
+      // Store in localStorage for duplicate prevention
+      const subscribers: SubscriberData[] = JSON.parse(
+        localStorage.getItem("saji_subscribers") || "[]"
+      )
+      
       const newSubscriber: SubscriberData = {
         email,
         subscribedAt: new Date().toISOString(),
-        deviceId: generateDeviceId(),
+        deviceId,
       }
-
+      
       subscribers.push(newSubscriber)
       localStorage.setItem("saji_subscribers", JSON.stringify(subscribers))
 
-      const response = await fetch("/api/subscribers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newSubscriber),
-      })
-
-      if (!response.ok) throw new Error("API error")
-
       setFeedback({
         type: "success",
-        message: "You're subscribed! Check your inbox soon.",
+        message: data.message || "You're subscribed! Check your inbox soon.",
       })
 
       setEmail("")
@@ -117,6 +139,7 @@ export function EmailSubscriptionPopup() {
         setFeedback({ type: null, message: "" })
       }, 2000)
     } catch (error) {
+      console.error("[v0] Subscription error:", error)
       setFeedback({
         type: "error",
         message: "Something went wrong. Please try again.",
