@@ -572,6 +572,54 @@ export const agentChatHistory = pgTable("agent_chat_history", {
 }))
 
 /* ================================
+   CHATBOT KNOWLEDGE BASE
+================================ */
+
+export const faqArticles = pgTable("faq_articles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  category: varchar("category", { length: 100 }).notNull(), // orders, payments, account, services, etc
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  keywords: text("keywords"), // comma-separated for search
+  isActive: boolean("is_active").default(true),
+  views: integer("views").default(0),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+}, (table) => ({
+  categoryIdx: index("faq_articles_category_idx").on(table.category),
+  activeIdx: index("faq_articles_active_idx").on(table.isActive)
+}));
+
+export const knowledgeDocuments = pgTable("knowledge_documents", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  category: varchar("category", { length: 100 }).notNull(), // policies, guides, terms, etc
+  content: text("content").notNull(),
+  fileUrl: varchar("file_url", { length: 500 }), // for PDFs or uploaded docs
+  embedding: text("embedding"), // JSON string of embedding vectors for semantic search
+  isActive: boolean("is_active").default(true),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+}, (table) => ({
+  categoryIdx: index("knowledge_documents_category_idx").on(table.category),
+  activeIdx: index("knowledge_documents_active_idx").on(table.isActive)
+}));
+
+export const aiKnowledgeCache = pgTable("ai_knowledge_cache", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  queryHash: varchar("query_hash", { length: 64 }).unique(),
+  relatedFaqIds: text("related_faq_ids"), // JSON array of FAQ IDs
+  relatedDocIds: text("related_doc_ids"), // JSON array of document IDs
+  context: text("context"), // cached context for the AI
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow()
+}, (table) => ({
+  expiresIdx: index("ai_knowledge_cache_expires_idx").on(table.expiresAt)
+}));
+
+/* ================================
    ANALYTICS EVENTS
 ================================ */
 
