@@ -1,19 +1,13 @@
 
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import dynamic from "next/dynamic"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { LocalizationProvider } from "@/lib/localization-context"
 import { AuthProvider } from "@/lib/auth-context"
+import { LayoutClientComponents } from "@/app/layout-client-components"
 import "./globals.css"
-
-// Dynamic import of EmailSubscriptionPopup to avoid SSR issues
-const EmailSubscriptionPopup = dynamic(
-  () => import("@/components/email-subscription-popup").then(mod => ({ default: mod.EmailSubscriptionPopup })),
-  { ssr: false }
-)
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -72,8 +66,9 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} themes={["light", "dark"]} disableTransitionOnChange>
           <LocalizationProvider>
             <AuthProvider>
-              {children}
-              <EmailSubscriptionPopup />
+              <LayoutClientComponents>
+                {children}
+              </LayoutClientComponents>
             </AuthProvider>
           </LocalizationProvider>
         </ThemeProvider>
