@@ -1,6 +1,4 @@
 
-import { SessionProvider } from "next-auth/react"
-
 import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
@@ -39,7 +37,7 @@ export const metadata: Metadata = {
     apple: "/apple-icon.png",
   },
   manifest: "/manifest.json",
-    generator: 'v0.app'
+  generator: "v0.app",
 }
 
 export const viewport: Viewport = {
@@ -68,11 +66,8 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} themes={["light", "dark"]} disableTransitionOnChange>
           <LocalizationProvider>
             <AuthProvider>
-               <SessionProvider>
-          {children} 
-          <EmailSubscriptionPopup />
-        </SessionProvider>
-             
+              {children}
+              <EmailSubscriptionPopup />
             </AuthProvider>
           </LocalizationProvider>
         </ThemeProvider>
