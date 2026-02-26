@@ -1,40 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, customers } from "@/lib/db/schema";
 import {
   hashPassword,
   generateToken,
   createResponse,
-} from "@/lib/auth";
+} from "@/lib/auth/auth-utils";
 import { eq } from "drizzle-orm";
-import { sendWelcomeEmail } from "@/lib/services/email";
-
-const signupSchema = z.object({
-  email: z.string().email(),
-  firstName: z.string().min(2),
-  lastName: z.string().min(2),
-  password: z.string().min(8),
-  phone: z.string().optional(),
-  role: z.enum(["admin", "professional", "client", "shopkeeper"]).default("client"),
-});
-
-type SignupPayload = z.infer<typeof signupSchema>;
 
 export async function POST(req: NextRequest) {
   try {
-    const body: SignupPayload = await req.json();
+    const body = await req.json();
+    const { firstName, lastName, email, phone, password, role = "client" } = body;
 
-    // Validate input
-    const validation = signupSchema.safeParse(body);
-    if (!validation.success) {
+    // Validate required fields
+    if (!firstName || !lastName || !email || !password) {
       return NextResponse.json(
-        createResponse(false, "Validation failed", validation.error.errors),
+        createResponse(false, "Missing required fields"),
         { status: 400 }
       );
     }
-
-    const { email, firstName, lastName, password, phone, role } = validation.data;
 
     // Check if user already exists
     const existingUser = await db.query.users.findFirst({
@@ -55,28 +40,33 @@ export async function POST(req: NextRequest) {
     const newUser = await db
       .insert(users)
       .values({
-        email,
         fullName: `${firstName} ${lastName}`,
-        passwordHash: hashedPassword,
+        email,
         phone: phone || null,
+        passwordHash: hashedPassword,
         role: role as any,
         isActive: true,
       })
       .returning();
 
-    console.log(" User created:", newUser[0].id);
+    console.log("[v0] User created:", newUser[0].id);
+
+    // Create customer profile if role is client
+    if (role === "client") {
+      await db.insert(customers).values({
+        userId: newUser[0].id,
+      });
+      console.log("[v0] Customer profile created");
+    }
 
     // Generate token
-    const token = generateToken({
-      userId: parseInt(newUser[0].id),
+    const token = await generateToken({
+      userId: newUser[0].id,
       email: newUser[0].email,
       role: newUser[0].role,
     });
 
-    // Send welcome email
-    await sendWelcomeEmail(email, firstName);
-
-    console.log(" Welcome email sent to:", email);
+    console.log("[v0] Token generated for:", email);
 
     return NextResponse.json(
       createResponse(true, "Signup successful", {
@@ -91,9 +81,9 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Signup error:", error);
+    console.error("[v0] Signup error:", error);
     return NextResponse.json(
-      createResponse(false, "Signup failed"),
+      createResponse(false, "Signup failed. Please try again later."),
       { status: 500 }
     );
   }

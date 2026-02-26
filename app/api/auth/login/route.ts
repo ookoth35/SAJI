@@ -1,35 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import {
-  comparePassword,
+  verifyPassword,
   generateToken,
   createResponse,
-} from "@/lib/auth";
+} from "@/lib/auth/auth-utils";
 import { eq } from "drizzle-orm";
-
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-});
-
-type LoginPayload = z.infer<typeof loginSchema>;
 
 export async function POST(req: NextRequest) {
   try {
-    const body: LoginPayload = await req.json();
+    const body = await req.json();
+    const { email, password } = body;
 
-    // Validate input
-    const validation = loginSchema.safeParse(body);
-    if (!validation.success) {
+    // Validate required fields
+    if (!email || !password) {
       return NextResponse.json(
-        createResponse(false, "Validation failed", validation.error.errors),
+        createResponse(false, "Email and password are required"),
         { status: 400 }
       );
     }
-
-    const { email, password } = validation.data;
 
     // Find user
     const user = await db.query.users.findFirst({
@@ -38,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        createResponse(false, "Invalid credentials"),
+        createResponse(false, "Invalid email or password"),
         { status: 401 }
       );
     }
@@ -46,34 +36,35 @@ export async function POST(req: NextRequest) {
     // Check if user is active
     if (!user.isActive) {
       return NextResponse.json(
-        createResponse(false, "Account is inactive"),
+        createResponse(false, "Your account has been deactivated"),
         { status: 403 }
       );
     }
 
-    // Compare password
+    // Verify password
     if (!user.passwordHash) {
       return NextResponse.json(
-        createResponse(false, "Invalid credentials"),
+        createResponse(false, "Invalid email or password"),
         { status: 401 }
       );
     }
-    const passwordMatch = await comparePassword(password, user.passwordHash);
+
+    const passwordMatch = await verifyPassword(password, user.passwordHash);
     if (!passwordMatch) {
       return NextResponse.json(
-        createResponse(false, "Invalid credentials"),
+        createResponse(false, "Invalid email or password"),
         { status: 401 }
       );
     }
 
     // Generate token
-    const token = generateToken({
-      userId: parseInt(user.id, 10),
+    const token = await generateToken({
+      userId: user.id,
       email: user.email,
       role: user.role,
     });
 
-    console.log(" User logged in:", user.id);
+    console.log("[v0] User logged in:", user.id);
 
     return NextResponse.json(
       createResponse(true, "Login successful", {
@@ -82,15 +73,16 @@ export async function POST(req: NextRequest) {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
+          profileImage: user.profileImage,
         },
         token,
       }),
       { status: 200 }
     );
   } catch (error) {
-    console.error(" Login error:", error);
+    console.error("[v0] Login error:", error);
     return NextResponse.json(
-      createResponse(false, "Login failed"),
+      createResponse(false, "Login failed. Please try again later."),
       { status: 500 }
     );
   }

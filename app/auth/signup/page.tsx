@@ -4,14 +4,12 @@ export const runtime = "nodejs";
 import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { signIn } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Mail, Lock, User, ArrowRight, Eye, EyeOff, Apple, ArrowLeft, Sparkles, Shield, Clock } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
 
 function SignupContent() {
   const router = useRouter()
@@ -78,55 +76,46 @@ function SignupContent() {
 
     setIsLoading(true)
     try {
-      // Signup via credentials provider
-    const res = await fetch("/api/auth/signup", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(formData),
-})
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password,
+          role: formData.role,
+        }),
+      })
 
-const data = await res.json()
+      const data = await res.json()
 
-if (!res.ok) {
-  setError(data.message)
-  return
-}
+      if (!res.ok) {
+        setError(data.message || "Signup failed")
+        return
+      }
 
-// Save JWT
-localStorage.setItem("token", data.data.token)
-// After signup is successful, pass query params
-const params = new URLSearchParams({
-  firstName: formData.firstName,
-  lastName: formData.lastName,
-  email: formData.email,
-  phone: formData.phone,
-  role: formData.role,
-})
+      console.log("[v0] Signup successful:", data.data)
 
-router.push(`/auth/complete-profile?${params.toString()}`)
+      // Save token to localStorage
+      localStorage.setItem("token", data.data.token)
+      localStorage.setItem("user", JSON.stringify(data.data.user))
+
+      // Redirect to complete profile with user data
+      const params = new URLSearchParams({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+      })
+
+      router.push(`/auth/complete-profile?${params.toString()}`)
     } catch (err) {
+      console.error("[v0] Signup error:", err)
       setError("An error occurred. Please try again.")
     } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleGoogleSignup = async () => {
-    setIsLoading(true)
-    try {
-      await signIn("google", { redirectTo: "/auth/complete-profile" })
-    } catch (err) {
-      setError("Failed to sign up with Google")
-      setIsLoading(false)
-    }
-  }
-
-  const handleAppleSignup = async () => {
-    setIsLoading(true)
-    try {
-      await signIn("apple", { redirectTo: "/auth/complete-profile" })
-    } catch (err) {
-      setError("Failed to sign up with Apple")
       setIsLoading(false)
     }
   }
@@ -301,26 +290,6 @@ router.push(`/auth/complete-profile?${params.toString()}`)
                 </Button>
               </div>
             </form>
-          )}
-
-          {/* Divider */}
-          <div className="my-5 flex items-center gap-3">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-xs text-muted-foreground font-medium">or continue with</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-
-          {/* Social */}
-          {step === 1 && (
-            <div className="grid grid-cols-2 gap-3">
-              <Button type="button" onClick={handleGoogleSignup} disabled={isLoading} variant="outline" className="h-10 rounded-xl bg-card gap-2 text-sm font-medium">
-                <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.64-.15-3.21-.43-4.73H24v9.01h12.4c-.54 2.91-2.18 5.38-4.65 7.04l7.2 5.59c4.21-3.88 6.65-9.6 6.65-16.91z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24s.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.81l-7.2-5.59c-2 1.35-4.56 2.15-8.7 2.15-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-                Google
-              </Button>
-              <Button type="button" onClick={handleAppleSignup} disabled={isLoading} className="h-10 rounded-xl gap-2 text-sm font-medium bg-foreground text-background hover:bg-foreground/90">
-                <Apple className="w-4 h-4" /> Apple
-              </Button>
-            </div>
           )}
 
           {/* Footer */}
