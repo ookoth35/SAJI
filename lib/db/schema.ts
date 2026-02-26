@@ -508,6 +508,69 @@ export const chatbotMessages = pgTable("chatbot_messages", {
   sentAt: timestamp("sent_at").defaultNow()
 });
 
+export const supportAgents = pgTable("support_agents", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  departmentId: uuid("department_id"),
+  status: varchar("status", { length: 50 }).default("offline"), // online, offline, busy, on_break
+  activeChatsCount: integer("active_chats_count").default(0),
+  maxConcurrentChats: integer("max_concurrent_chats").default(5),
+  acceptsChat: boolean("accepts_chat").default(true),
+  isAvailable: boolean("is_available").default(false),
+  lastActivityAt: timestamp("last_activity_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+}, (table) => ({
+  userIdIdx: index("support_agents_user_id_idx").on(table.userId),
+  statusIdx: index("support_agents_status_idx").on(table.status),
+  availabilityIdx: index("support_agents_availability_idx").on(table.isAvailable)
+}));
+
+export const chatEscalations = pgTable("chat_escalations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  conversationId: uuid("conversation_id")
+    .references(() => chatbotConversations.id, { onDelete: "cascade" })
+    .notNull(),
+  assignedAgentId: uuid("assigned_agent_id")
+    .references(() => supportAgents.id, { onDelete: "set null" }),
+  escalationReason: text("escalation_reason"),
+  status: varchar("status", { length: 50 }).default("pending"), // pending, assigned, in_progress, resolved, closed
+  priority: varchar("priority", { length: 50 }).default("normal"), // low, normal, high, urgent
+  escalatedAt: timestamp("escalated_at").defaultNow(),
+  assignedAt: timestamp("assigned_at"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+}, (table) => ({
+  conversationIdIdx: index("chat_escalations_conversation_id_idx").on(table.conversationId),
+  assignedAgentIdx: index("chat_escalations_agent_id_idx").on(table.assignedAgentId),
+  statusIdx: index("chat_escalations_status_idx").on(table.status),
+  priorityIdx: index("chat_escalations_priority_idx").on(table.priority)
+}));
+
+export const agentChatHistory = pgTable("agent_chat_history", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  escalationId: uuid("escalation_id")
+    .references(() => chatEscalations.id, { onDelete: "cascade" })
+    .notNull(),
+  agentId: uuid("agent_id")
+    .references(() => supportAgents.id, { onDelete: "cascade" })
+    .notNull(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  sender: varchar("sender", { length: 50 }).notNull(), // agent or user
+  message: text("message").notNull(),
+  isRead: boolean("is_read").default(false),
+  sentAt: timestamp("sent_at").defaultNow()
+}, (table) => ({
+  escalationIdIdx: index("agent_chat_history_escalation_id_idx").on(table.escalationId),
+  agentIdIdx: index("agent_chat_history_agent_id_idx").on(table.agentId),
+  userIdIdx: index("agent_chat_history_user_id_idx").on(table.userId)
+}))
+
 /* ================================
    ANALYTICS EVENTS
 ================================ */
