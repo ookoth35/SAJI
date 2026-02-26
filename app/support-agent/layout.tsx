@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { redirect } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 
 export default function SupportAgentLayout({
   children,
@@ -10,10 +9,20 @@ export default function SupportAgentLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const [isChecking, setIsChecking] = useState(true)
+  const pathname = usePathname()
+  const [isChecking, setIsChecking] = useState(false)
   const [isAgent, setIsAgent] = useState(false)
 
+  // Only check agent status on protected pages (not login or public pages)
+  const isLoginPage = pathname === "/support-agent/login"
+  const isProtectedPage = !isLoginPage
+
   useEffect(() => {
+    if (!isProtectedPage) {
+      setIsChecking(false)
+      return
+    }
+
     const checkAgentStatus = async () => {
       try {
         const token = localStorage.getItem("token")
@@ -50,9 +59,16 @@ export default function SupportAgentLayout({
       }
     }
 
+    setIsChecking(true)
     checkAgentStatus()
-  }, [router])
+  }, [router, isProtectedPage])
 
+  // On login page, don't show verification screen
+  if (isLoginPage) {
+    return <>{children}</>
+  }
+
+  // On protected pages, show verification screen while checking
   if (isChecking) {
     return (
       <div className="flex items-center justify-center min-h-screen">
