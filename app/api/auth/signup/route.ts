@@ -6,6 +6,7 @@ import {
   generateToken,
   createResponse,
 } from "@/lib/auth/auth-utils";
+import { sendWelcomeEmail } from "@/lib/services/email";
 import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
@@ -67,6 +68,15 @@ export async function POST(req: NextRequest) {
     });
 
     console.log("[v0] Token generated for:", email);
+
+    // Send welcome email
+    try {
+      const emailSent = await sendWelcomeEmail(email, firstName);
+      console.log("[v0] Welcome email sent:", emailSent ? "success" : "failed");
+    } catch (emailError) {
+      console.error("[v0] Failed to send welcome email:", emailError);
+      // Don't fail the signup if email fails, just log it
+    }
 
     return NextResponse.json(
       createResponse(true, "Signup successful", {
