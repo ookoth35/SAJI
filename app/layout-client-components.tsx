@@ -4,7 +4,7 @@ import dynamic from "next/dynamic"
 
 // Client component wrapper for EmailSubscriptionPopup with SSR disabled
 const EmailSubscriptionPopup = dynamic(
-  () => import("@/components/email-subscription-popup").then(mod => ({ default: mod.EmailSubscriptionPopup })),
+  () => import("@/components/email-subscription-popup").then(mod => mod.EmailSubscriptionPopup ? { default: mod.EmailSubscriptionPopup } : mod),
   { ssr: false }
 )
 
