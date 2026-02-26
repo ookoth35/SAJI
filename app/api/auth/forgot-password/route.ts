@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { sendPasswordResetEmail } from "@/lib/services/email";
+import { sendPasswordResetEmail, sendPasswordResetCodeSMS } from "@/lib/services/email";
 import { createResponse } from "@/lib/auth/auth-utils";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
@@ -130,10 +130,8 @@ export async function POST(req: NextRequest) {
     let codeSent = false;
     if (method === "email") {
       codeSent = await sendCodeViaEmail(user.email, code);
-    } else if (method === "phone") {
-      // TODO: Implement SMS sending via provider (Twilio, etc)
-      console.log("[v0] SMS code (demo):", code);
-      codeSent = true; // Demo mode
+    } else if (method === "phone" && user.phone) {
+      codeSent = await sendPasswordResetCodeSMS(user.phone, code);
     }
 
     if (!codeSent) {

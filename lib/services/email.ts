@@ -274,64 +274,23 @@ export async function sendPasswordResetEmail(
   }
 }
 
-// Send newsletter subscription confirmation email
-export async function sendNewsletterSubscriptionEmail(
-  email: string
+// Send password reset code via SMS
+export async function sendPasswordResetCodeSMS(
+  phone: string,
+  code: string
 ): Promise<boolean> {
   try {
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px; margin-bottom: 30px;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to SAJI Newsletter!</h1>
-        </div>
-        
-        <p style="font-size: 16px; line-height: 1.6;">Thank you for subscribing to our newsletter!</p>
-        
-        <div style="background-color: #f0f4ff; padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #667eea;">
-          <h3 style="margin-top: 0; color: #667eea;">What you'll receive:</h3>
-          <ul style="margin: 10px 0; padding-left: 20px;">
-            <li>Exclusive product updates and new features</li>
-            <li>Special offers and early access deals</li>
-            <li>Tips and tricks to get the most out of SAJI</li>
-            <li>Industry news and professional insights</li>
-            <li>Important announcements</li>
-          </ul>
-        </div>
-        
-        <p style="color: #666; font-size: 14px; line-height: 1.6;">
-          We're committed to keeping you informed without overwhelming your inbox. We'll send newsletters weekly with curated content tailored to your interests.
-        </p>
-        
-        <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin: 25px 0; text-align: center;">
-          <p style="margin: 0; color: #999; font-size: 13px;">
-            Not interested? <a href="#" style="color: #667eea; text-decoration: none; font-weight: 500;">Update your preferences</a> or <a href="#" style="color: #667eea; text-decoration: none; font-weight: 500;">unsubscribe</a> anytime.
-          </p>
-        </div>
-        
-        <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
-        
-        <p style="color: #999; font-size: 12px;">
-          You received this email because you subscribed to the SAJI newsletter. Your email is secure and will never be shared.
-        </p>
-        
-        <p style="color: #999; font-size: 12px;">
-          <strong>SAJI | Connecting professionals with clients</strong><br/>
-          Nairobi, Kenya
-        </p>
-      </div>
-    `;
-
-    const result = await resend.emails.send({
-      from: "onboarding@resend.dev",
-      to: email,
-      subject: "Welcome to SAJI Newsletter - Thank You for Subscribing!",
-      html,
+    // Resend SMS API
+    const result = await resend.sms.send({
+      from: "SAJI",
+      to: phone,
+      text: `Your SAJI password reset code is: ${code}. This code expires in 10 minutes. Never share this code with anyone.`,
     });
 
-    console.log("[v0] Newsletter subscription confirmation email sent:", result);
+    console.log("[v0] Password reset SMS sent:", result);
     return !result.error;
   } catch (error) {
-    console.error("[v0] Error sending newsletter subscription email:", error);
+    console.error("[v0] Error sending password reset SMS:", error);
     return false;
   }
 }
