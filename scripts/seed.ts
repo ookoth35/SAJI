@@ -12,7 +12,7 @@ if (!DATABASE_URL) {
 }
 
 async function seedDatabase() {
-  console.log("Starting database seed...");
+  console.log("Starting database initialization and seeding...");
 
   try {
     const pool = new Pool({
@@ -20,6 +20,8 @@ async function seedDatabase() {
     });
 
     const db = drizzle(pool, { schema });
+
+    console.log("Initializing database schema...");
 
     // Create admin user
     const adminUser = await db
@@ -76,7 +78,25 @@ async function seedDatabase() {
 
     console.log("✓ Client user created:", clientUser[0]?.id || "already exists");
 
-    console.log("\nDatabase seeding completed successfully!");
+    // Create sample support agent
+    if (professionalUser[0]) {
+      const supportAgent = await db
+        .insert(schema.supportAgents)
+        .values({
+          userId: professionalUser[0].id,
+          status: "online",
+          activeChatsCount: 0,
+          maxConcurrentChats: 5,
+          acceptsChat: true,
+          isAvailable: true,
+        })
+        .onConflictDoNothing()
+        .returning();
+
+      console.log("✓ Support agent created:", supportAgent[0]?.id || "already exists");
+    }
+
+    console.log("\nDatabase initialization and seeding completed successfully!");
     process.exit(0);
   } catch (error) {
     console.error("Seeding failed:", error);
