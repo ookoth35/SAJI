@@ -97,9 +97,22 @@ export default function CompleteProfilePage() {
 
       setSuccess(true)
 
-      // Redirect to dashboard after 2 seconds
+      // Redirect to appropriate dashboard based on role after 2 seconds
       setTimeout(() => {
-        router.push("/dashboard")
+        const role = formData.role
+        console.log("[v0] Profile completed for role:", role)
+        
+        if (role === "client") {
+          router.push("/customer/home")
+        } else if (role === "professional") {
+          router.push("/provider/dashboard")
+        } else if (role === "shopkeeper") {
+          router.push("/shopkeeper")
+        } else if (role === "admin") {
+          router.push("/admin/dashboard")
+        } else {
+          router.push("/customer/home")
+        }
       }, 2000)
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "An error occurred"

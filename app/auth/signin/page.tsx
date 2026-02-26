@@ -92,11 +92,19 @@ function SigninContent() {
 
       // Redirect based on role
       const role = data.data.user.role
-      if (role === "client") router.push("/dashboard")
-      else if (role === "professional") router.push("/dashboard/professional")
-      else if (role === "shopkeeper") router.push("/dashboard/shopkeeper")
-      else if (role === "admin") router.push("/dashboard/admin")
-      else router.push("/dashboard")
+      console.log("[v0] User role:", role)
+      
+      if (role === "client") {
+        router.push("/customer/home")
+      } else if (role === "professional") {
+        router.push("/provider/dashboard")
+      } else if (role === "shopkeeper") {
+        router.push("/shopkeeper")
+      } else if (role === "admin") {
+        router.push("/admin/dashboard")
+      } else {
+        router.push("/customer/home")
+      }
     } catch (err) {
       console.error("[v0] Login error:", err)
       setError("An error occurred. Please try again.")

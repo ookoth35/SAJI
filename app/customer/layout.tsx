@@ -1,10 +1,10 @@
 "use client"
 
-import React from "react"
+import React, { useEffect } from "react"
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useAuthContext } from "@/lib/auth-context"
 import { 
   Home, Store, Briefcase, Users, MessageCircle, UserSearch, Settings,
@@ -18,9 +18,17 @@ import Image from "next/image"
 
 export default function CustomerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { user, logout } = useAuthContext()
+  const router = useRouter()
+  const { user, logout, isAuthenticated, isLoading } = useAuthContext()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+
+  // Protect route - redirect if not authenticated or not a client
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || (user?.role !== "client" && user?.role !== "customer"))) {
+      router.push("/auth/signin")
+    }
+  }, [isAuthenticated, isLoading, user, router])
 
   const navItems = [
     { icon: Home, label: "Home", href: "/customer/home" },
