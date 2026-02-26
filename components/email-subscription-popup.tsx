@@ -27,29 +27,45 @@ export function EmailSubscriptionPopup() {
     message: string
   }>({ type: null, message: "" })
 
-  // Generate stable device fingerprint
+  // Generate stable device fingerprint - only in browser
   const generateDeviceId = () => {
-    const base = `${navigator.userAgent}-${navigator.language}-${navigator.platform}`
-    return btoa(base).substring(0, 32)
+    if (typeof navigator === "undefined" || typeof window === "undefined") {
+      return "no-device"
+    }
+    try {
+      const base = `${navigator.userAgent}-${navigator.language}-${navigator.platform}`
+      return btoa(base).substring(0, 32)
+    } catch {
+      return "no-device"
+    }
   }
 
   useEffect(() => {
-    const deviceId = generateDeviceId()
-    const subscribers: SubscriberData[] = JSON.parse(
-      localStorage.getItem("saji_subscribers") || "[]"
-    )
+    // Only run in browser
+    if (typeof window === "undefined" || typeof localStorage === "undefined") {
+      return
+    }
 
-    const alreadySubscribed = subscribers.some(
-      (sub) => sub.deviceId === deviceId
-    )
+    try {
+      const deviceId = generateDeviceId()
+      const subscribers: SubscriberData[] = JSON.parse(
+        localStorage.getItem("saji_subscribers") || "[]"
+      )
 
-    if (!alreadySubscribed) {
-      // Show popup after 10 minutes (600,000 milliseconds)
-      const timer = setTimeout(() => {
-        setOpen(true)
-      }, 600000)
+      const alreadySubscribed = subscribers.some(
+        (sub) => sub.deviceId === deviceId
+      )
 
-      return () => clearTimeout(timer)
+      if (!alreadySubscribed) {
+        // Show popup after 10 minutes (600,000 milliseconds)
+        const timer = setTimeout(() => {
+          setOpen(true)
+        }, 600000)
+
+        return () => clearTimeout(timer)
+      }
+    } catch (error) {
+      console.error("[v0] Error initializing email popup:", error)
     }
   }, [])
 
